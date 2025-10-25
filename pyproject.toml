@@ -1,0 +1,19 @@
+[project]
+name = "blog-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-deepseek",
+    "huggingface-hub>=0.33.4",
+    "faiss-cpu",
+    "langchain-community>=0.4",
+    "langchain-text-splitters>=1.0.0",
+    "langchain-huggingface>=1.0.0",
+    "langchain>=1.0.2",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.mirrors.ustc.edu.cn/simple/"
+default = true
