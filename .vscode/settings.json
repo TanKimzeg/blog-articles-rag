@@ -3,4 +3,9 @@
     "python-envs.defaultPackageManager": "ms-python.python:pip",
     "python-envs.pythonProjects": [],
     "python.analysis.typeCheckingMode": "standard",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
 }
