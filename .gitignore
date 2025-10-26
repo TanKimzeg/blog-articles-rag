@@ -11,3 +11,6 @@ wheels/
 
 # vector store directories
 vector_index/
+
+# model files
+models/
