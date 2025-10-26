@@ -12,6 +12,20 @@ dependencies = [
     "langchain-text-splitters>=1.0.0",
     "langchain-huggingface>=1.0.0",
     "langchain>=1.0.2",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+    "orjson",
+    "pyyaml",
+    "sentence-transformers>=5.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "pytest-cov",
 ]
 
 [[tool.uv.index]]
