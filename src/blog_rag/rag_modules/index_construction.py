@@ -28,7 +28,11 @@ class IndexConstructionModule:
         logger.info(f"正在初始化嵌入模型: {self.model_name} ...")
 
         self.embeddings = HuggingFaceEmbeddings(
-            model_name=snapshot_download(self.model_name),
+            model_name=snapshot_download(
+                self.model_name,
+                local_dir=self.index_save_path.parent / "models",
+                endpoint="https://hf-mirror.com"  # 国内用户使用镜像加速下载
+            ),
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True}
         )

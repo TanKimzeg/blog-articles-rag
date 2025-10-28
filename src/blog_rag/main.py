@@ -72,44 +72,52 @@ class BlogRAGSystem:
 
         logger.info("RAG系统初始化完成!")
 
-    def build_knowledge_index(self):
+    def build_knowledge_index(self) -> bool:
         '''构建知识向量索引'''
-        assert self.index_module is not None
-        logger.info("正在构建知识向量索引...")
+        try:
+            assert self.index_module is not None
+            logger.info("正在构建知识向量索引...")
 
-        assert self.data_module is not None
-        logger.info("正在加载和处理文档...")
-        self.data_module.load_markdowns()
-        logger.info("正在切分文档...")
-        chunks = self.data_module.chunk_markdowns()
-        vectorstore = self.index_module.load_vector_index()
-        if vectorstore is not None:
-            logger.info("成功加载已保存的向量索引!")
-        else:
-            logger.info("未找到已保存的向量索引，开始构建新索引...")
-            vectorstore = self.index_module.build_vector_index(chunks)
-            logger.info("正在保存向量索引...")
-            self.index_module.save_vector_index(vectorstore)
+            assert self.data_module is not None
+            logger.info("正在加载和处理文档...")
+            self.data_module.load_markdowns()
+            logger.info("正在切分文档...")
+            chunks = self.data_module.chunk_markdowns()
+            vectorstore = self.index_module.load_vector_index()
+            if vectorstore is not None:
+                logger.info("成功加载已保存的向量索引!")
+            else:
+                logger.info("未找到已保存的向量索引，开始构建新索引...")
+                vectorstore = self.index_module.build_vector_index(chunks)
+                logger.info("正在保存向量索引...")
+                self.index_module.save_vector_index(vectorstore)
 
-        logger.info("初始化检索优化")
-        self.retrieval_module = RetrievalOptimizationModule(
-            vectorstore=vectorstore,
-            chunks=chunks
-        )
+            logger.info("初始化检索优化")
+            self.retrieval_module = RetrievalOptimizationModule(
+                vectorstore=vectorstore,
+                chunks=chunks
+            )
+            return True
+        except Exception as e:
+            logger.error(f"构建知识向量索引失败: {e}")
+            return False
 
-        # 显示统计信息
-        stats = self.data_module.get_statistics()
 
-    def query_chunks(self, query: str, filters: Dict[str, Any] | None) -> List[ChunkInfo]:
+    def query_chunks(
+            self, 
+            query: str, 
+            filters: Dict[str, Any] | None,
+            top_k: int
+        ) -> List[ChunkInfo]:
         assert self.retrieval_module is not None
         logger.info("正在执行查询...")
         if filters is None:
             relevant_chunks = self.retrieval_module.hybrid_search(
-                query, top_k=self.config.top_k
+                query, top_k
             )
         else:
             relevant_chunks = self.retrieval_module.metadata_filtered_search(
-                query, filters, top_k=self.config.top_k
+                query, filters, top_k
             )
         logger.info(f"检索到 {len(relevant_chunks)} 个相关文档块。")
         
@@ -128,6 +136,7 @@ class BlogRAGSystem:
                 metadata=doc.metadata,
                 path=path
             )
+        logger.warning(f"未找到ID为 {id} 的Markdown文档。")
         return None
 
 
