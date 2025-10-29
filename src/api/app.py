@@ -112,10 +112,6 @@ def v1_get_doc(doc_id: str, rag: BlogRAGSystem = Depends(get_rag_dep)):
         return fail(message="Document not found")
     return ok(data=MarkdownVO(content=md.content, metadata=md.metadata, path=str(md.path)))
 
-@api_v1.post("/reindex", response_model=ApiResponse[Dict[str, str]])
-def v1_reindex(rag: BlogRAGSystem = Depends(get_rag_dep)):
-    return ok() if rag.build_knowledge_index() else fail(message="Reindexing failed")
-
 # 注册 v1 路由
 app.include_router(api_v1)
 
