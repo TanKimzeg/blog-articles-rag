@@ -1,4 +1,4 @@
-# Blog RAG 搜索引擎
+# 博客文章智慧搜索（RAG）
 
 一个基于 LangChain + FAISS 的轻量级博客知识检索与生成（RAG）项目：
 
@@ -45,20 +45,23 @@ Python 版本：pyproject 要求 `>= 3.13`
 
 1. 安装后端依赖（使用 uv）：
 
-   - uv sync
+   ```shell
+   uv sync
+   uv pip install -e .
+   ```
 
 2. 安装前端依赖（Node 18+ 推荐）：
 
-   - cd frontend
-   - npm i
-
-可选：DeepSeek 生成模块（仅当需要时）
-
-- Windows PowerShell：`$env:DEESEEK_API_KEY = "YOUR_KEY"`
+   ```shell
+   cd frontend
+   npm install
+   ```
 
 ## 数据准备
 
-将你的 Markdown 放入 `resources/markdown/`，建议带 YAML front matter，如：
+在 `.env` 中可进行自定义配置，包括Markdown文件所在目录、是否重建索引、API Key等。
+
+Markdown文件建议带 YAML front matter，如：
 
 ```yaml
 ---
@@ -73,7 +76,7 @@ tags: [llm]
 
 后端（FastAPI）：
 
-- `uv run uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000`
+- `uv run uvicorn api.app:app --reload`
 
 前端（Vite 开发服务器，已代理 /api 到 8000）：
 
