@@ -1,4 +1,5 @@
 import re
+import pickle
 import logging
 import operator
 from hashlib import md5
@@ -14,22 +15,22 @@ CHUNKS = List[Document]
 MARKDOWNS = List[Document]
 
 class DataPreparationModule:
-    CATEGORIES: Set[Any] = set()
-    TAGS: Set[Any] = set()
+    categories: Set[Any] = set()
+    tags: Set[Any] = set()
     id2markdown: Dict[str, Tuple[Path, Document]] = dict()
 
-    def __init__(self, data_dir: str | Path):
-        self.data_root = Path(data_dir).resolve()
+    def __init__(self, markdown_dir: str | Path, cache_dir: str | Path):
+        self.markdown_dir = Path(markdown_dir).resolve()
+        self.cache_dir = Path(cache_dir).resolve()
         self.documents: MARKDOWNS = [] # 存储加载的 Markdown 文档列表
         self.chunks: CHUNKS = []      # 存储切分后的文档块列表
 
-    def load_markdowns(self) -> MARKDOWNS:
-        markdown_path = self.data_root / "markdown"
-        logger.info(f"正在从 {markdown_path} 加载 Markdown 文件...")
+    def generate_markdown(self) -> MARKDOWNS:
+        logger.info(f"正在从 {self.markdown_dir} 加载 Markdown 文件...")
         documents: MARKDOWNS = []
-        for md_file in markdown_path.glob("*.md"):
+        for md_file in self.markdown_dir.rglob("*.md"):
             content = md_file.read_text(encoding="utf-8")
-            relative_path = md_file.relative_to(self.data_root).as_posix()
+            relative_path = md_file.relative_to(self.markdown_dir).as_posix()
             file_id = md5(relative_path.encode("utf-8")).hexdigest()
 
             # 创建 Document 对象并附加元数据
@@ -47,16 +48,35 @@ class DataPreparationModule:
             self._update_metadata(doc)
             if "categories" in doc.metadata:
                 if isinstance(doc.metadata["categories"], list):
-                    self.CATEGORIES.update(doc.metadata["categories"])
+                    self.categories.update(doc.metadata["categories"])
                 else:
                     logger.warning(f"文档 {doc.metadata.get('path', '未知')} 的 categories 不是列表类型。")
             if "tags" in doc.metadata:
                 if isinstance(doc.metadata["tags"], list):
-                    self.TAGS.update(doc.metadata["tags"])
+                    self.tags.update(doc.metadata["tags"])
                 else:
                     logger.warning(f"文档 {doc.metadata.get('path', '未知')} 的 tags 不是列表类型。")
         self.documents = documents
         return documents
+
+    def load_markdowns(self) -> MARKDOWNS:
+        markdown_path = self.cache_dir / "markdowns.pkl"
+        logger.info(f"正在从 {markdown_path} 加载 Markdown 文档……")
+        try:
+            with open(markdown_path, "rb") as f:
+                self.documents = pickle.load(f)
+        except Exception as e:
+            logger.error(f"加载 Markdown 文档失败: {e}")
+            self.documents = []
+        finally:
+            logger.info(f"已加载 {len(self.documents)} 个 Markdown 文档。")
+            return self.documents
+
+    def save_markdowns(self) -> None:
+        markdown_path = self.cache_dir / "markdowns.pkl"
+        logger.info(f"正在保存加载的 Markdown 文档到 {markdown_path}...")
+        with open(markdown_path, "wb") as f:
+            pickle.dump(self.documents, f)
 
     def _update_metadata(self, doc: Document) -> None:
         content = doc.page_content
@@ -83,9 +103,8 @@ class DataPreparationModule:
             inline_meta = {}
         doc.metadata.update(inline_meta)
 
-    @classmethod
-    def get_categories_and_tags(cls) -> Tuple[Set[Any], Set[Any]]:
-        return cls.CATEGORIES, cls.TAGS
+    def get_categories_and_tags(self) -> Tuple[Set[Any], Set[Any]]:
+        return self.categories, self.tags
 
     def chunk_markdowns(self) -> CHUNKS:
         '''
@@ -99,6 +118,32 @@ class DataPreparationModule:
         self.chunks = chunks
         logger.info(f"切分完成!共切分出 {len(chunks)} 个文档块。")
         return chunks
+
+    def save_chunks(self) -> None:
+        chunks_path = self.cache_dir / "chunks.pkl"
+        logger.info(f"正在保存文档块到 {chunks_path}...")
+        with open(chunks_path, "wb") as f:
+            pickle.dump(self.chunks, f)
+
+    def load_chunks(self) -> CHUNKS:
+        chunks_path = self.cache_dir / "chunks.pkl"
+        logger.info(f"正在从 {chunks_path} 加载文档块……")
+        try:
+            with open(chunks_path, "rb") as f:
+                self.chunks = pickle.load(f)
+        except Exception as e:
+            logger.error(f"加载文档块失败: {e}")
+            self.chunks = []
+        finally:
+            logger.info(f"已加载 {len(self.chunks)} 个文档块。")
+            return self.chunks        
+
+    def renew_data(self) -> Tuple[MARKDOWNS, CHUNKS]:
+        self.generate_markdown()
+        self.save_markdowns()
+        self.chunk_markdowns()
+        self.save_chunks()
+        return self.documents, self.chunks
 
     def _markdown_split(self) -> CHUNKS:
         # 切分层级
@@ -117,7 +162,7 @@ class DataPreparationModule:
         for doc in self.documents:
             md_chunks = markdown_splitter.split_text(doc.page_content)
             
-            logger.info(f"文档 {doc.metadata.get('path', '未知')} 被切分为 {len(md_chunks)} 个块。")
+            logger.debug(f"文档 {doc.metadata.get('path', '未知')} 被切分为 {len(md_chunks)} 个块。")
 
             # 为每个块建立与父文档的联系
             for i, chunk in enumerate(md_chunks):
@@ -159,8 +204,8 @@ class DataPreparationModule:
         stats = {
             "total_markdown_files": len(self.documents),
             "total_chunks": len(self.chunks),
-            "unique_categories": list(self.CATEGORIES),
-            "unique_tags": list(self.TAGS),
+            "unique_categories": list(self.categories),
+            "unique_tags": list(self.tags),
             "avg_chunk_size": sum(len(chunk.page_content) 
                                   for chunk in self.chunks) / len(self.chunks) if self.chunks else 0
         }

@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <header>
-      <div class="title">Blog RAG 搜索</div>
+      <div class="title">博客文章智慧搜索</div>
     </header>
 
     <div class="panel">

@@ -54,13 +54,13 @@ class GenerationIntegrationModule(BasicChatModel):
     """生成集成模块 - 负责LLM集成和回答生成"""
     def __init__(
             self,
+            api_key: str | None,
             model_name: str = "deepseek-chat",
             temperature: float = 0.0,
             max_tokens: int = 2048,
         ) -> None:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
-            raise ValueError("DEEPSEEK_API_KEY 环境变量未设置。请设置您的 DeepSeek API 密钥。")
+            raise ValueError("LLM_API_KEY 环境变量未设置。请设置您的 LLM API 密钥。")
         super().__init__(
             model_name=model_name,
             api_key=api_key,

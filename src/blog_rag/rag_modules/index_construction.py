@@ -18,8 +18,8 @@ class IndexConstructionModule:
     vectorstore: FAISS | None = None
     def __init__(
             self, 
-            model_name: str = "BAAI/bge-small-zh-v1.5",
-            index_save_path: str | Path = "./resources/vector_index"
+            model_name: str,
+            index_save_path: str | Path
         ) -> None:
         self.model_name = model_name
         self.index_save_path = Path(index_save_path)
@@ -30,7 +30,7 @@ class IndexConstructionModule:
         self.embeddings = HuggingFaceEmbeddings(
             model_name=snapshot_download(
                 self.model_name,
-                local_dir=self.index_save_path.parent / "models",
+                cache_dir=self.index_save_path.parent / "models",
                 endpoint="https://hf-mirror.com"  # 国内用户使用镜像加速下载
             ),
             model_kwargs={"device": "cpu"},
@@ -50,10 +50,10 @@ class IndexConstructionModule:
         return vectorstore
 
     def add_chunks(self, new_chunks: CHUNKS):
+        logger.info(f"正在向向量索引中添加 {len(new_chunks)} 个新文档块...")
         if not self.vectorstore:
             self.build_vector_index(new_chunks)
             return
-        logger.info(f"正在向向量索引中添加 {len(new_chunks)} 个新文档块...")
         self.vectorstore.add_documents(new_chunks)
         logger.info("新文档块添加完成。")
 
@@ -72,8 +72,8 @@ class IndexConstructionModule:
             self.setup_embeddings()
         assert self.embeddings is not None
 
-        try:
-            if db_type.upper() == "FAISS":
+        if db_type.upper() == "FAISS":
+            try:
                 load_path = str(Path(self.index_save_path / "faiss_index").resolve())
                 self.vectorstore = FAISS.load_local(
                     load_path, 
@@ -81,10 +81,10 @@ class IndexConstructionModule:
                     allow_dangerous_deserialization=True
                 )
                 logger.info(f"已从 {load_path} 加载 FAISS 向量索引。")
-            else:
-                raise ValueError(f"不受支持的向量存储类型: {db_type}")
-        finally:
-            return self.vectorstore
+            finally:
+                return self.vectorstore
+        else:
+            raise ValueError(f"不受支持的向量存储类型: {db_type}")
 
     def similarity_search(
             self, 

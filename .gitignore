@@ -9,8 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-# vector store directories
-vector_index/
+# Environment variable files
+.env
 
-# model files
-models/
+# Vector store directories
+resources/*
+tests/fixtures/data/

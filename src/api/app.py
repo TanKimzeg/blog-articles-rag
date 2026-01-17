@@ -1,5 +1,6 @@
 import uuid
 import logging
+import asyncio
 from fastapi import FastAPI, APIRouter, Depends, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,13 +19,25 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Blog RAG System...")
-    app.state.rag = BlogRAGSystem()
+    logger.info("Starting Blog RAG System (deferred build)...")
+
+    # 创建 RAG 系统但不在构造时自动启动耗时操作
+    rag = BlogRAGSystem(auto_start=False)
+    rag.initialize_modules()
+    app.state.rag = rag
     try:
         yield
     finally:
-        # 在此释放资源（如需要）
-        pass
+        # 在关闭时尝试优雅取消后台构建任务
+        task = getattr(app.state, "rag_build_task", None)
+        if task and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                logger.info("后台索引构建任务已取消")
+        # 在此释放其他资源（如需要）
+        logger.info("Blog RAG System shutdown complete.")
 
 
 app = FastAPI(title="Blog RAG API", lifespan=lifespan)
@@ -36,14 +49,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # 统一依赖：从 state 读取 RAG，若未初始化则惰性创建（测试/生产均可用）
-def get_rag_dep(request: Request) -> BlogRAGSystem:
+async def get_rag_dep(request: Request) -> BlogRAGSystem:
     rag = getattr(request.app.state, "rag", None)
     if rag is None:
-        logger.warning("app.state.rag 未初始化，进行惰性创建。")
-        rag = BlogRAGSystem()
+        logger.warning("app.state.rag 未初始化，进行惰性创建（sync/测试场景）。")
+        rag = BlogRAGSystem(auto_start=False)
+        await asyncio.to_thread(rag.initialize_modules)
         request.app.state.rag = rag
+        return rag
+
+    # 如果有正在进行的构建任务，等待其完成以保证检索可用
+    build_task = getattr(request.app.state, "rag_build_task", None)
+    if build_task and not build_task.done():
+        logger.info("等待后台索引构建完成...")
+        try:
+            await build_task
+        except Exception as e:
+            logger.warning("后台索引构建任务失败: %s", e)
+
     return rag
 
 
@@ -82,12 +106,12 @@ api_v1 = APIRouter()
 
 @api_v1.get("/meta/categories", response_model=ApiResponse[Dict[str, Any]])
 def v1_categories(rag: BlogRAGSystem = Depends(get_rag_dep)):
-    categories = list(rag.data_module.CATEGORIES) if rag.data_module else []
+    categories = list(rag.data_module.categories) if rag.data_module else []
     return ok(data={"items": categories, "total": len(categories)})
 
 @api_v1.get("/meta/tags", response_model=ApiResponse[Dict[str, Any]])
 def v1_tags(rag: BlogRAGSystem = Depends(get_rag_dep)):
-    tags = list(rag.data_module.TAGS) if rag.data_module else []
+    tags = list(rag.data_module.tags) if rag.data_module else []
     return ok(data={"items": tags, "total": len(tags)})
 
 @api_v1.post("/search", response_model=ApiResponse[PageResult])
